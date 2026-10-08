@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['gui.py', 'strategy.py', '.github/workflows/build.yml']
+    paths: ['gui.py', 'strategy.py', 'QuotexAPI/**', '.github/workflows/build.yml']
 jobs:
   build:
     runs-on: windows-latest
@@ -12,12 +12,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Vendor QuotexAPI
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/chipadevteam/quotexapi.git qxapi_tmp
+          Copy-Item -Recurse -Force qxapi_tmp/QuotexAPI ./QuotexAPI
+          Remove-Item -Recurse -Force qxapi_tmp
       - name: Install deps
         run: |
           pip install pyinstaller
-          pip install git+https://github.com/chipadevteam/quotexapi.git
+          pip install -r requirements.txt
+      - name: Verify QuotexAPI import
+        run: python -c "from QuotexAPI import QuotexAPI, TradeDirection, AccountType; print('QuotexAPI OK')"
       - name: Build EXE
-        run: pyinstaller --onefile --windowed --name HamzaQxBot gui.py
+        run: pyinstaller --onefile --windowed --name HamzaQxBot --hidden-import QuotexAPI gui.py
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
