@@ -1,0 +1,25 @@
+name: Build QX Bot EXE
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['gui.py', 'strategy.py', '.github/workflows/build.yml']
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          pip install pyinstaller
+          pip install git+https://github.com/chipadevteam/quotexapi.git
+      - name: Build EXE
+        run: pyinstaller --onefile --windowed --name HamzaQxBot gui.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: HamzaQxBot-exe
+          path: dist/HamzaQxBot.exe
