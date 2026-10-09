@@ -1,13 +1,13 @@
 plugins { id 'com.android.application' }
 android {
-    namespace 'com.hamza.qxbot'
+    namespace 'com.nova.signaltrader'
     compileSdk 34
     defaultConfig {
-        applicationId "com.hamza.qxbot"
+        applicationId "com.nova.signaltrader"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "2.0"
     }
     buildTypes {
         debug { signingConfig signingConfigs.debug }
@@ -17,7 +17,18 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+    // Cronet native .so sirf in ABIs ke liye (APK size control)
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a"
+            universalApk true
+        }
+    }
 }
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    // Chromium network stack — real Chrome TLS fingerprint (stealth)
+    implementation 'org.chromium.net:cronet-bundled:141.7340.3'
 }
