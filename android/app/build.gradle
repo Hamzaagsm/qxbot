@@ -18,14 +18,6 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     // Cronet native .so sirf in ABIs ke liye (APK size control)
-    splits {
-        abi {
-            enable true
-            reset()
-            include "armeabi-v7a", "arm64-v8a"
-            universalApk true
-        }
-    }
 }
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
