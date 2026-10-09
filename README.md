@@ -1,20 +1,29 @@
-# Hamza Quotex Bot 🤖
+# 🤖 Hamza Qx Bot (Android)
 
-1-minute auto trading bot for Quotex with GUI.
+Quotex auto-trading bot ka **Android APK** — mobile par login aur monitoring aasan!
 
-## Strategy
-EMA(20/50) trend filter + RSI(14) confirmation, chop filter.
+## Features
+- 🔑 Login screen (email/password, yaad rakhta hai)
+- 📊 Asset selector: EURUSD, GBPUSD, USDJPY, AUDUSD, EURJPY, BTCUSD...
+- 💵 Stake + Max trades setting
+- 📈 Strategy: EMA(9/21) + RSI(14) — desktop jaisi (configurable)
+- ▶️ Big START / ⏹ STOP buttons
+- 📜 Live scrolling log
+- 💰 Balance display (live)
+- 📊 Trade history (win/loss)
+- ⚠️ REAL mode sakht warning ke saath (default: DEMO)
 
-## ⚠️ WARNINGS
-- **Demo first!** Real money = risk of loss + account ban.
-- Quotex has NO official API. This uses reverse-engineered library.
-- No strategy guarantees profit.
+## Technical
+- Native Java, **no WebView**
+- Direct Socket.IO (EIO=3) HTTP long-polling client (`QuotexClient.java`)
+- Desktop Python bot ka protocol port: `login`, `depth/follow`, `orders/open`, `s_balance/list`
+- Trade result = balance difference (real P/L, desktop ke mock se behtar)
+- OkHttp 4.12.0 only dependency
 
-## Run (Windows EXE)
-Double-click HamzaQxBot.exe, enter email/password, select DEMO, START.
+## Build
+GitHub Actions: push on `main` → APK artifact `HamzaQxBot-apk`.
 
-## Run (Python)
-```
-pip install -r requirements.txt
-python gui.py
-```
+## ⚠️ Warnings
+- **Pehle DEMO par test karo!**
+- Bot se **profit ki guarantee NAHI** — paise doob sakte hain
+- **Quotex bots ko BAN kar sakta hai**
