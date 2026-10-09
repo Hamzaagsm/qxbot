@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  * Quotex Socket.IO (EIO=3) client over HTTP long-polling — v2.0.
  *
  * Connection strategy (sab se pehle jo kaam kare):
- *   1. Cronet transport (real Chrome TLS fingerprint -> max stealth)
+    // (Cronet removed — OkHttp+DoH only for reliability)
  *      x hosts [ws2.qxbroker.com, ws.qxbroker.com]
  *   2. OkHttp + DNS-over-HTTPS transport (ISP DNS block ka tor)
  *      x hosts [ws2.qxbroker.com, ws.qxbroker.com]
@@ -153,8 +153,8 @@ public class QuotexClient {
     // ---------------- connection ----------------
     public void connect() throws Exception {
         HttpTransport[] transports = new HttpTransport[]{
-                new CronetTransport(appCtx),   // stealth first
-                new OkHttpDohTransport(),       // DNS-block fallback
+                new OkHttpDohTransport(),       // DNS-over-HTTPS (ISP block bypass)
+                new OkHttpDohTransport(),       // retry with DoH
         };
         Exception lastErr = null;
         boolean sawDnsError = false;
