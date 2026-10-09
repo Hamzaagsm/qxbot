@@ -30,5 +30,4 @@ android {
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // Chromium network stack — real Chrome TLS fingerprint (stealth)
-    implementation 'org.chromium.net:cronet-bundled:141.7340.3'
 }
