@@ -34,6 +34,17 @@ public class OkHttpDohTransport implements HttpTransport {
     // Plain client (system DNS) used ONLY for the DoH queries themselves.
     private final OkHttpClient dohHttp;
 
+    /**
+     * Hardcoded IPs for Quotex WS hosts (v2.1). Last resort jab DNS poori tarah
+     * block ho — direct IP par connect karo, SNI/Host me asal hostname rehta hai.
+     * IPs 2026-10-12 ko verify kiye gaye; Quotex kabhi badal sakta hai.
+     */
+    private static final Map<String, String> HARDCODED_IPS = new HashMap<>();
+    static {
+        HARDCODED_IPS.put("ws.qxbroker.com", "198.18.97.43");
+        HARDCODED_IPS.put("ws2.qxbroker.com", "198.18.97.44");
+    }
+
     /** DNS that falls back to DNS-over-HTTPS when system DNS fails. */
     private static class DohDns implements Dns {
         private final OkHttpClient dohHttp;
@@ -43,9 +54,26 @@ public class OkHttpDohTransport implements HttpTransport {
             try {
                 return Dns.SYSTEM.lookup(host);
             } catch (UnknownHostException first) {
+                // 1. Google DoH
                 List<InetAddress> r = dohQuery("https://dns.google/resolve?name=" + host + "&type=A", host);
+                // 2. Cloudflare DoH
                 if (r == null || r.isEmpty())
-                    r = cloudflareQuery(host);
+                    r = dohQueryCf("https://cloudflare-dns.com/dns-query?name=" + host + "&type=A", host);
+                // 3. Quad9 DoH (v2.1 naya)
+                if (r == null || r.isEmpty())
+                    r = dohQueryCf("https://dns.quad9.net/dns-query?name=" + host + "&type=A", host);
+                // 4. AdGuard DoH (v2.1 naya)
+                if (r == null || r.isEmpty())
+                    r = dohQueryCf("https://dns.adguard-dns.com/dns-query?name=" + host + "&type=A", host);
+                // 5. Hardcoded IP fallback (v2.1 naya) — DNS ki zaroorat hi nahi
+                if ((r == null || r.isEmpty()) && HARDCODED_IPS.containsKey(host)) {
+                    try {
+                        String ip = HARDCODED_IPS.get(host);
+                        r = new ArrayList<>();
+                        r.add(InetAddress.getByName(ip));
+                        Log.i(TAG, "Hardcoded IP used for " + host + " -> " + ip);
+                    } catch (Exception ignored) {}
+                }
                 if (r == null || r.isEmpty()) throw first;
                 Log.i(TAG, "DoH resolved " + host + " -> " + r.get(0).getHostAddress());
                 return r;
@@ -81,10 +109,10 @@ public class OkHttpDohTransport implements HttpTransport {
             }
         }
 
-        private List<InetAddress> cloudflareQuery(String host) {
+        private List<InetAddress> dohQueryCf(String url, String host) {
             try {
                 Request req = new Request.Builder()
-                        .url("https://cloudflare-dns.com/dns-query?name=" + host + "&type=A")
+                        .url(url)
                         .header("Accept", "application/dns-json")
                         .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36")
                         .get().build();
@@ -105,7 +133,7 @@ public class OkHttpDohTransport implements HttpTransport {
                     return out;
                 }
             } catch (Exception e) {
-                Log.w(TAG, "CF DoH failed: " + e.getMessage());
+                Log.w(TAG, "DoH-CF query failed: " + e.getMessage());
                 return null;
             }
         }
