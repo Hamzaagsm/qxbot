@@ -13,10 +13,10 @@ import java.util.Random;
 import java.util.TreeMap;
 
 /**
- * Bot trading loop v2.0.
+ * Bot trading loop v2.2.
  *
  * Flow: connect -> login -> balance -> depth/follow -> warmup candles ->
- * signal on each new closed 1-min candle -> human-like pause -> orders/open ->
+ * signal on each new closed 1-min candle (OHLC: ATR guard + candle confirmation) -> human-like pause -> orders/open ->
  * wait expiry -> balance diff = profit -> stats + history.
  *
  * Stealth: signal ke baad 3-12s random "human hesitation" pause, ~12% signals
@@ -64,8 +64,12 @@ public class BotEngine {
     private volatile boolean running;
     private Thread worker;
 
-    // timestamp -> close (latest update per candle wins)
-    private final TreeMap<Long, Double> candles = new TreeMap<>();
+    // timestamp -> OHLC candle (latest update per candle wins)
+    private static class Candle {
+        final double o, h, l, c;
+        Candle(double o, double h, double l, double c) { this.o = o; this.h = h; this.l = l; this.c = c; }
+    }
+    private final TreeMap<Long, Candle> candles = new TreeMap<>();
     private String followedAsset;
 
     public BotEngine(Config cfg, Ui ui) {
@@ -123,17 +127,18 @@ public class BotEngine {
             long lastSigTs = 0;
 
             while (running && trades < cfg.maxTrades) {
-                List<Double> closes;
+                List<Double> opens, highs, lows, closes;
                 long newest;
                 synchronized (candles) {
-                    if (candles.size() < 2) { closes = null; newest = -1; }
+                    if (candles.size() < 2) { opens = highs = lows = closes = null; newest = -1; }
                     else {
                         List<Long> keys = new ArrayList<>(candles.keySet());
                         List<Long> closed = keys.subList(0, keys.size() - 1); // latest still forming
-                        closes = new ArrayList<>();
+                        opens = new ArrayList<>(); highs = new ArrayList<>();
+                        lows = new ArrayList<>(); closes = new ArrayList<>();
                         for (long k : closed) {
-                            double c = candles.get(k);
-                            if (c > 0) closes.add(c);
+                            Candle cd = candles.get(k);
+                            if (cd.c > 0) { opens.add(cd.o); highs.add(cd.h); lows.add(cd.l); closes.add(cd.c); }
                         }
                         newest = closed.get(closed.size() - 1);
                     }
@@ -149,7 +154,15 @@ public class BotEngine {
                 lastSigTs = newest;
 
                 String sig;
-                try { sig = Strategy.signal(closes, cfg.emaFast, cfg.emaSlow, cfg.rsiPeriod, cfg.strongOnly); }
+                try {
+                    // Agar depth payload me asal OHLC nahi aa raha (sab flat candles),
+                    // to purana closes-only rasta — warna ATR guard har trade rok dega.
+                    boolean ohlcReal = false;
+                    for (int i = 0; i < highs.size(); i++) if (highs.get(i) > lows.get(i)) { ohlcReal = true; break; }
+                    sig = ohlcReal
+                            ? Strategy.signal(opens, highs, lows, closes, cfg.emaFast, cfg.emaSlow, cfg.rsiPeriod, cfg.strongOnly)
+                            : Strategy.signal(closes, cfg.emaFast, cfg.emaSlow, cfg.rsiPeriod, cfg.strongOnly);
+                }
                 catch (Exception e) { sig = null; }
                 if (sig == null) { sleepQuiet(3000); continue; }
 
@@ -243,8 +256,15 @@ public class BotEngine {
             long t = d.optLong("timestamp", d.optLong("time", 0));
             double close = d.optDouble("close", 0);
             if (t <= 0 || close <= 0) return;
+            // OHLC agar payload me hon to wohi; warna close se flat candle (ATR/candle filters degrade gracefully)
+            double open = d.has("open") ? d.optDouble("open", close) : close;
+            double high = d.has("high") ? d.optDouble("high", close) : close;
+            double low  = d.has("low")  ? d.optDouble("low", close)  : close;
+            if (open <= 0) open = close;
+            if (high <= 0) high = Math.max(open, close);
+            if (low <= 0) low = Math.min(open, close);
             synchronized (candles) {
-                candles.put(t, close);
+                candles.put(t, new Candle(open, high, low, close));
                 while (candles.size() > 150) candles.pollFirstEntry();
             }
         } catch (Exception ignored) {}
